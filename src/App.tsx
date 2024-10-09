@@ -6,10 +6,14 @@ import "./App.css";
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("");
+  const [time, setTime] = useState(0);
 
   async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    setGreetMsg(await invoke("greet", { name }));
+    // 耗时开始
+    const startTime = Date.now();
+    const msg = await invoke<string>("greet", { name })
+    setTime(Date.now() - startTime);
+    setGreetMsg(msg);
   }
 
   return (
@@ -46,6 +50,7 @@ function App() {
       </form>
 
       <p>{greetMsg}</p>
+      <p>{time}</p>
     </div>
   );
 }

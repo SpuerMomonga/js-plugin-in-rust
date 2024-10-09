@@ -1,6 +1,6 @@
 use std::{
     env,
-    io::{Read, Write},
+    io::{BufRead, BufReader, Write},
     process::{Child, Command, Stdio},
     sync::Mutex,
 };
@@ -10,21 +10,27 @@ use tauri::State;
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
 fn greet(name: &str, connection: State<ServicesConnection>) -> String {
+
+    let mut output = String::new();
+    
     if let Ok(mut plugin) = connection.plugin.lock() {
         if let Some(stdin) = plugin.stdin.as_mut() {
-            let _ = stdin.write_all(name.as_bytes());
+            stdin.write_all(format!("{}", name).as_bytes()).expect("写入子进程数据错误!");
+            stdin.flush().expect("刷新子进程 stdin 错误!");  // Ensure data is sent immediately
         }
 
         if let Some(stdout) = plugin.stdout.as_mut() {
-            let mut output = String::new();
-            stdout
-                .read_to_string(&mut output)
-                .expect("读取子进程数据错误!");
-            return output;
+            let reader = BufReader::new(stdout);
+
+            for line in reader.lines() {
+                let line = line.expect("读取子进程数据错误!");
+                output.push_str(&line);
+                break;  // Assuming we read only one line of response
+            }
         }
     }
 
-    String::new()
+    output.trim().to_string()
 }
 
 struct ServicesConnection {
@@ -34,7 +40,7 @@ struct ServicesConnection {
 impl Drop for ServicesConnection {
     fn drop(&mut self) {
         if let Ok(mut plugin) = self.plugin.lock() {
-            let _ = plugin.kill();
+            plugin.kill().expect("释放插件管理子进程错误！");
         }
     }
 }
